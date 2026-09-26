@@ -1,15 +1,15 @@
-package it.kristikomini.inventory;
+package it.kristikomini.orders;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-/** Inventory / WMS allocation service — owns stock and reserves it for orders. */
+/** Order service — owns orders, produces OrderPlaced via a transactional outbox, and runs the saga. */
 @SpringBootApplication
 @EnableScheduling // drives the outbox relay
-public class InventoryApplication {
+public class OrderApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(InventoryApplication.class, args);
+        SpringApplication.run(OrderApplication.class, args);
     }
 }

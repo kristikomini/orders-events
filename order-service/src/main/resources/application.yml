@@ -1,20 +1,20 @@
 spring:
   application:
-    name: inventory-service
+    name: order-service
   datasource:
-    url: jdbc:postgresql://localhost:5434/inventory
+    url: jdbc:postgresql://localhost:5433/orders
     username: app
     password: app
   jpa:
     hibernate:
-      ddl-auto: validate    # schema owned by Flyway (standards rule 1)
+      ddl-auto: validate
     open-in-view: false
   flyway:
     enabled: true
   kafka:
     bootstrap-servers: localhost:9092
     consumer:
-      group-id: inventory-service
+      group-id: order-service
       auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.apache.kafka.common.serialization.StringDeserializer

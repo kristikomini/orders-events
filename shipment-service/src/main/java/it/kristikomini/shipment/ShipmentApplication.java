@@ -1,15 +1,15 @@
-package it.kristikomini.inventory;
+package it.kristikomini.shipment;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-/** Inventory / WMS allocation service — owns stock and reserves it for orders. */
+/** Shipment service — schedules a shipment when stock is reserved, and emits ShipmentScheduled. */
 @SpringBootApplication
-@EnableScheduling // drives the outbox relay
-public class InventoryApplication {
+@EnableScheduling
+public class ShipmentApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(InventoryApplication.class, args);
+        SpringApplication.run(ShipmentApplication.class, args);
     }
 }
