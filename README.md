@@ -51,17 +51,22 @@ If a step fails or a message is redelivered, the outcome is the same — that is
    committed and a failure downstream (payment/shipment) triggers a compensating event that
    releases the reserved stock.
 
-## What this demonstrates (CV bullets — fill numbers after building)
+## What this demonstrates (CV bullets)
 
-- Built two event-driven Spring Boot services over Kafka with a transactional outbox,
-  eliminating lost-event dual-write failures; verified with a Testcontainers Kafka + Postgres
-  integration suite of `<N>` tests.
-- Made consumers idempotent (dedupe by `orderId`), proven by replaying `<N>` duplicate messages
-  with zero double-reservations.
-- Benchmarked optimistic vs pessimistic vs Redis-lock stock reservation under 100 concurrent
-  requests for 1 unit; guaranteed zero oversell and chose `<strategy>` (`<N>` res/s, p95 `<N>` ms).
-- Implemented an order → stock → shipment saga with compensation; measured end-to-end p95 of
-  `<N>` ms under `<N>` orders/s locally.
+*Proven by tests in this repo (embedded Kafka in-JVM; Postgres via Testcontainers in CI):*
+- Built three event-driven Spring Boot services over Kafka with a **transactional outbox** in each
+  producer, eliminating lost-event dual-write failures; the whole `OrderPlaced → reserve →
+  StockReserved` leg is verified against embedded Kafka + real Postgres.
+- Made consumers **idempotent** (dedupe by `orderId`), proven by replaying a duplicate `OrderPlaced`
+  and asserting no second reservation.
+- Guaranteed **zero oversell** of the last unit under **100 concurrent requests** with both
+  optimistic (`@Version` + retry) and pessimistic (`FOR UPDATE`) strategies — verified against real
+  Postgres (exactly one wins, stock ends at 0).
+- Implemented an order → stock → shipment **saga** with compensation (`StockRejected` → order
+  `CANCELLED`; `ShipmentScheduled` → order `CONFIRMED`).
+
+*To fill in once benchmarked:* strategy throughput (res/s), end-to-end saga p95, and the Redis
+distributed-lock third strategy.
 
 ## Run it
 
