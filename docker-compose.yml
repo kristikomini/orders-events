@@ -1,5 +1,5 @@
-# Kafka (KRaft, no ZooKeeper), Postgres per service, Redis, Prometheus. App services added
-# during fill once each has a Dockerfile.
+# Full event-driven stack: `docker compose up --build`.
+# Kafka (KRaft), one Postgres per service, Redis, and the three Spring Boot services.
 services:
   kafka:
     image: confluentinc/cp-kafka:7.7.1
@@ -12,6 +12,7 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       CLUSTER_ID: kraft-cluster-orders-01
     ports: [ "9092:9092" ]
 
@@ -19,24 +20,75 @@ services:
     image: postgres:16-alpine
     environment: { POSTGRES_DB: orders, POSTGRES_USER: app, POSTGRES_PASSWORD: app }
     ports: [ "5433:5432" ]
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U app -d orders" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   postgres-inventory:
     image: postgres:16-alpine
     environment: { POSTGRES_DB: inventory, POSTGRES_USER: app, POSTGRES_PASSWORD: app }
     ports: [ "5434:5432" ]
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U app -d inventory" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   postgres-shipment:
     image: postgres:16-alpine
     environment: { POSTGRES_DB: shipment, POSTGRES_USER: app, POSTGRES_PASSWORD: app }
     ports: [ "5435:5432" ]
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U app -d shipment" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
 
   redis:
     image: redis:7-alpine
     ports: [ "6379:6379" ]
 
-  prometheus:
-    image: prom/prometheus:v2.54.1
-    ports: [ "9090:9090" ]
-    # TODO(fill): mount ./ops/prometheus.yml scraping the three services' /actuator/prometheus
+  order-service:
+    build:
+      context: .
+      dockerfile: order-service/Dockerfile
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-orders:5432/orders
+      SPRING_DATASOURCE_USERNAME: app
+      SPRING_DATASOURCE_PASSWORD: app
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    ports: [ "8080:8080" ]
+    depends_on:
+      postgres-orders: { condition: service_healthy }
+      kafka: { condition: service_started }
 
-  # TODO(fill): order-service / inventory-service / shipment-service — build each module.
+  inventory-service:
+    build:
+      context: .
+      dockerfile: inventory-service/Dockerfile
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-inventory:5432/inventory
+      SPRING_DATASOURCE_USERNAME: app
+      SPRING_DATASOURCE_PASSWORD: app
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+    depends_on:
+      postgres-inventory: { condition: service_healthy }
+      kafka: { condition: service_started }
+      redis: { condition: service_started }
+
+  shipment-service:
+    build:
+      context: .
+      dockerfile: shipment-service/Dockerfile
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-shipment:5432/shipment
+      SPRING_DATASOURCE_USERNAME: app
+      SPRING_DATASOURCE_PASSWORD: app
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      postgres-shipment: { condition: service_healthy }
+      kafka: { condition: service_started }

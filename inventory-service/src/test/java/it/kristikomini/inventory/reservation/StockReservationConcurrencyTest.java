@@ -1,5 +1,6 @@
 package it.kristikomini.inventory.reservation;
 
+import com.redis.testcontainers.RedisContainer;
 import it.kristikomini.inventory.domain.Stock;
 import it.kristikomini.inventory.domain.StockRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -8,6 +9,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -26,9 +29,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * The concurrency shootout: fire 100 requests at the <b>last single unit</b> and prove that exactly
- * one wins and stock never goes negative — for each reservation strategy. Uses a
- * {@link CountDownLatch} start gate plus a {@link CyclicBarrier} so the threads genuinely collide
- * rather than trickle through. Real PostgreSQL (Testcontainers); skips without Docker, runs in CI.
+ * one wins and stock never goes negative — for all three reservation strategies (optimistic,
+ * pessimistic, Redis lock). A {@link CyclicBarrier} makes the threads genuinely collide rather than
+ * trickle through. Real PostgreSQL + Redis (Testcontainers); skips without Docker, runs in CI.
  */
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
@@ -41,8 +44,17 @@ class StockReservationConcurrencyTest {
     @ServiceConnection
     static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
 
+    @Container
+    static RedisContainer redis = new RedisContainer("redis:7-alpine");
+
+    @DynamicPropertySource
+    static void redisProps(DynamicPropertyRegistry registry) {
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
+    }
+
     @Autowired
-    Map<String, StockReserver> reservers; // keyed by bean name: "optimistic", "pessimistic"
+    Map<String, StockReserver> reservers; // keyed by bean name: "optimistic", "pessimistic", "redis"
 
     @Autowired
     StockRepository stock;
@@ -54,7 +66,7 @@ class StockReservationConcurrencyTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"optimistic", "pessimistic"})
+    @ValueSource(strings = {"optimistic", "pessimistic", "redis"})
     void exactlyOneReservationWinsForTheLastUnit(String strategyName) throws Exception {
         StockReserver reserver = reservers.get(strategyName);
         assertThat(reserver).as("strategy bean %s", strategyName).isNotNull();

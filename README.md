@@ -59,14 +59,14 @@ If a step fails or a message is redelivered, the outcome is the same — that is
   StockReserved` leg is verified against embedded Kafka + real Postgres.
 - Made consumers **idempotent** (dedupe by `orderId`), proven by replaying a duplicate `OrderPlaced`
   and asserting no second reservation.
-- Guaranteed **zero oversell** of the last unit under **100 concurrent requests** with both
-  optimistic (`@Version` + retry) and pessimistic (`FOR UPDATE`) strategies — verified against real
-  Postgres (exactly one wins, stock ends at 0).
-- Implemented an order → stock → shipment **saga** with compensation (`StockRejected` → order
-  `CANCELLED`; `ShipmentScheduled` → order `CONFIRMED`).
+- Guaranteed **zero oversell** of the last unit under **100 concurrent requests** with all three
+  strategies — optimistic (`@Version` + retry), pessimistic (`FOR UPDATE`) and a **Redis
+  distributed lock** — verified against real Postgres + Redis (exactly one wins, stock ends at 0).
+- Implemented an order → stock → shipment **saga** with compensation, each leg covered by an
+  integration test (embedded Kafka + Testcontainers Postgres): `OrderPlaced → StockReserved →
+  ShipmentScheduled → order CONFIRMED`, and `StockRejected → order CANCELLED`.
 
-*To fill in once benchmarked:* strategy throughput (res/s), end-to-end saga p95, and the Redis
-distributed-lock third strategy.
+*To fill in once benchmarked:* strategy throughput (res/s) and end-to-end saga p95.
 
 ## Run it
 
